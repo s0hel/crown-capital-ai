@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { properties, dealScores, rentEstimates } from "@/db/schema";
-import { eq, desc, isNull, isNotNull } from "drizzle-orm";
+import { eq, desc, isNull, and, sql } from "drizzle-orm";
 import { fmtMoney, fmtPctFromBps } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -20,27 +20,55 @@ async function loadScored(): Promise<Row[]> {
     .leftJoin(rentEstimates, eq(rentEstimates.propertyId, properties.id))
     .where(eq(properties.status, "active"))
     .orderBy(desc(dealScores.compositeScore))
+    .limit(200)
     .all();
 }
 
 async function loadUnscored(): Promise<Row[]> {
-  // Properties that exist in DB but have no deal score yet (HCAD imports without rent comps)
   return db
     .select({ property: properties, score: dealScores, rent: rentEstimates })
     .from(properties)
     .leftJoin(dealScores, eq(dealScores.propertyId, properties.id))
     .leftJoin(rentEstimates, eq(rentEstimates.propertyId, properties.id))
+    .where(and(eq(properties.status, "active"), isNull(dealScores.id)))
+    .orderBy(desc(properties.absenteeOwner))
+    .limit(200)
+    .all();
+}
+
+async function countActive(): Promise<number> {
+  const row = db
+    .select({ n: sql<number>`count(*)` })
+    .from(properties)
     .where(eq(properties.status, "active"))
-    .all()
-    .filter((r) => r.score === null)
-    .sort((a, b) =>
-      (b.property.absenteeOwner ? 1 : 0) - (a.property.absenteeOwner ? 1 : 0),
-    );
+    .get();
+  return row?.n ?? 0;
+}
+
+async function countScored(): Promise<number> {
+  const row = db
+    .select({ n: sql<number>`count(*)` })
+    .from(properties)
+    .innerJoin(dealScores, eq(dealScores.propertyId, properties.id))
+    .where(eq(properties.status, "active"))
+    .get();
+  return row?.n ?? 0;
+}
+
+async function countUnscored(): Promise<number> {
+  const row = db
+    .select({ n: sql<number>`count(*)` })
+    .from(properties)
+    .leftJoin(dealScores, eq(dealScores.propertyId, properties.id))
+    .where(and(eq(properties.status, "active"), isNull(dealScores.id)))
+    .get();
+  return row?.n ?? 0;
 }
 
 export default async function Home() {
-  const [scored, unscored] = await Promise.all([loadScored(), loadUnscored()]);
-  const total = scored.length + unscored.length;
+  const [scored, unscored, total, totalScored, totalUnscored] = await Promise.all([
+    loadScored(), loadUnscored(), countActive(), countScored(), countUnscored(),
+  ]);
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -70,22 +98,22 @@ export default async function Home() {
             {scored.length > 0 && (
               <section>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-3">
-                  Scored leads ({scored.length})
+                  Scored leads ({totalScored.toLocaleString()})
                 </h2>
-                <LeadsTable rows={scored} />
+                <LeadsTable rows={scored} total={totalScored} />
               </section>
             )}
 
             {unscored.length > 0 && (
               <section>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-1">
-                  Needs rent estimate ({unscored.length.toLocaleString()})
+                  Needs rent estimate ({totalUnscored.toLocaleString()})
                 </h2>
                 <p className="text-xs text-zinc-400 mb-3">
                   HCAD imports. Add a rent estimate on the property page to score.
                   Absentee-owner properties sorted first.
                 </p>
-                <UnscoredTable rows={unscored} />
+                <UnscoredTable rows={unscored} total={totalUnscored} />
               </section>
             )}
           </>
@@ -117,7 +145,7 @@ function EmptyState() {
   );
 }
 
-function LeadsTable({ rows }: { rows: Row[] }) {
+function LeadsTable({ rows, total }: { rows: Row[]; total: number }) {
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
       <table className="w-full text-sm">
@@ -177,13 +205,16 @@ function LeadsTable({ rows }: { rows: Row[] }) {
           })}
         </tbody>
       </table>
+      {total > rows.length && (
+        <p className="px-4 py-2 text-xs text-zinc-400 text-right border-t border-zinc-200 dark:border-zinc-800">
+          Showing top {rows.length} of {total.toLocaleString()} scored. Filter or add rent comps to narrow results.
+        </p>
+      )}
     </div>
   );
 }
 
-function UnscoredTable({ rows }: { rows: Row[] }) {
-  // Show at most 200 rows — full dataset can be very large after HCAD import
-  const shown = rows.slice(0, 200);
+function UnscoredTable({ rows, total }: { rows: Row[]; total: number }) {
   return (
     <>
       <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -199,7 +230,7 @@ function UnscoredTable({ rows }: { rows: Row[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {shown.map(({ property }) => (
+            {rows.map(({ property }) => (
               <tr key={property.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
                 <td className="px-4 py-3">
                   <Link href={`/property/${property.id}`} className="font-medium hover:underline">
@@ -236,9 +267,9 @@ function UnscoredTable({ rows }: { rows: Row[] }) {
           </tbody>
         </table>
       </div>
-      {rows.length > 200 && (
+      {total > rows.length && (
         <p className="mt-2 text-xs text-zinc-400 text-right">
-          Showing 200 of {rows.length.toLocaleString()} unscored. Add rent comps to score all automatically.
+          Showing {rows.length} of {total.toLocaleString()} unscored. Add rent comps to score all automatically.
         </p>
       )}
     </>

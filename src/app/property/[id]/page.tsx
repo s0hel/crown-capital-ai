@@ -10,16 +10,19 @@ import {
   HOUSTON_DEFAULTS,
   type Assumptions,
 } from "@/lib/scoring";
-import { addRentEstimateAction } from "./actions";
+import { addRentEstimateAction, updateListPriceAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function PropertyDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ priceError?: string }>;
 }) {
-  const { id: idStr } = await params;
+  const [{ id: idStr }, sp] = await Promise.all([params, searchParams]);
+  const priceError = sp.priceError;
   const id = Number(idStr);
   if (!Number.isFinite(id)) notFound();
 
@@ -66,7 +69,10 @@ export default async function PropertyDetail({
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Stat label="List price" value={fmtMoney(property.listPriceCents)} />
+          <Stat
+            label={property.source === "hcad-import" && !property.sourceUrl ? "HCAD appraisal" : "List price"}
+            value={fmtMoney(property.listPriceCents)}
+          />
           <Stat label="Estimated rent" value={rent ? fmtMoney(rent.estimatedRentCents) : "—"} />
           <Stat
             label="Composite score"
@@ -82,6 +88,62 @@ export default async function PropertyDetail({
             }
           />
         </div>
+
+        <Section title="Update listing price">
+          {priceError && (
+            <div className="mb-3 rounded-md bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 px-4 py-2 text-sm text-rose-700 dark:text-rose-300">
+              {decodeURIComponent(priceError)}
+            </div>
+          )}
+          {property.source === "hcad-import" && !property.sourceUrl && (
+            <p className="mb-3 text-xs text-amber-600 dark:text-amber-400">
+              Current price is an HCAD appraisal, not a real ask price. HCAD values often lag market by
+              30–60%+. Paste the HAR listing URL or enter the real price to re-score accurately.
+            </p>
+          )}
+          <form
+            action={updateListPriceAction.bind(null, property.id)}
+            className="space-y-3"
+          >
+            <label className="block">
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                HAR.com listing URL (auto-fetches price)
+              </span>
+              <input
+                name="harUrl"
+                type="url"
+                placeholder="https://www.har.com/homedetail/..."
+                className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              />
+            </label>
+            <div className="flex items-end gap-3">
+              <label className="flex-1 block">
+                <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  — or enter price manually ($)
+                </span>
+                <input
+                  name="manualPrice"
+                  type="number"
+                  step="1000"
+                  min="10000"
+                  placeholder="205000"
+                  className="mt-1 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                />
+              </label>
+              <button
+                type="submit"
+                className="rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium hover:bg-zinc-700 dark:hover:bg-zinc-300"
+              >
+                Update price
+              </button>
+            </div>
+          </form>
+          {score && (
+            <p className="mt-2 text-xs text-zinc-400">
+              Score will be recalculated automatically using the existing rent estimate.
+            </p>
+          )}
+        </Section>
 
         {score && (
           <Section title="Returns">
