@@ -2,7 +2,33 @@
   "permissions": {
     "allow": [
       "Bash(npm --version)",
-      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --use-npm --turbopack --no-experimental-https)"
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --use-npm --turbopack --no-experimental-https)",
+      "WebFetch(domain:hcad.org)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pdata.hcad.org)",
+      "Bash(curl -s -I \"https://download.hcad.org/data/CAMA/2025/Real_acct_owner.zip\")",
+      "Bash(curl -s -I \"https://download.hcad.org/data/CAMA/2025/Real_building_land.zip\")",
+      "Bash(curl -s --range 0-2097151 \"https://download.hcad.org/data/CAMA/2025/Real_acct_owner.zip\" -o /tmp/hcad_acct_head.zip)",
+      "Read(//tmp/**)",
+      "Read(//c/tmp/**)",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(node *)",
+      "Bash(unzip --version)",
+      "Bash(npm run *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(tasklist)",
+      "Bash(netstat -ano)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(grep -oE '\\(126,0[0-9]{2}|unscored|Needs rent|Scored|absentee|properties\\)')",
+      "WebFetch(domain:houston.craigslist.org)",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36' 'https://houston.craigslist.org/search/apa?bedrooms=3&postal=77008&search_distance=2' -o /tmp/cl_test.html)",
+      "Bash(curl -v -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' 'https://houston.craigslist.org/search/apa?bedrooms=3&postal=77008&search_distance=2')",
+      "Bash(curl -s -L -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Cookie: cl_b=4|44b7281ffc28f749b2943cb0f66b9a0cca6fdfe5|1778045115TDQV8' 'https://houston.craigslist.org/search/apa?min_bedrooms=3&max_bedrooms=3&postal=77008&search_distance=2' -o /tmp/cl_test.html)"
     ]
   }
 }

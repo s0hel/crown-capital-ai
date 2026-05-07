@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local sqlite database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# HCAD bulk data (large files, re-downloadable)
+/hcad-data/
